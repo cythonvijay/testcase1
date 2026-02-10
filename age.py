@@ -1,4 +1,4 @@
-age=int(input("Enter the age:"))
+age=20
 if(age>20):
     print("Age is Greater" )
 else:
