@@ -1,4 +1,4 @@
-age=20
+age=0
 if(age>20):
     print("Age is Greater" )
 else:
