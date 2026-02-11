@@ -1,4 +1,4 @@
-name: CRONOS Code Analysis
+name: CRONOS
 
 on:
   push:
@@ -11,18 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # IMPORTANT
+          fetch-depth: 2
 
-      - name: Run CRONOS
-        uses: cythonvijay/cronos-action@v1
+      - uses: cythonvijay/cronos-action@v1
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
 
-      - name: Upload CRONOS Reports
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: cronos-reports
           path: cronos-reports/
