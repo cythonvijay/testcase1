@@ -1,5 +1,5 @@
 age=10
-if(age>20):
+if(age>10):
     print("Age is Greater" )
 else:
     print("Age is less")
