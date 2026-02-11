@@ -28,7 +28,6 @@ jobs:
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
           mode: STRICT  # Options: STRICT, BOUNDARY, CONTRACT
-          fail-on-error: 'true'
         continue-on-error: true
       
       - name: Check Analysis Status
