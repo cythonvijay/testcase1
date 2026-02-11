@@ -2,12 +2,19 @@ name: CRONOS Guard
 
 on:
   push:
+    paths:
+      - "**.py"
   pull_request:
+    paths:
+      - "**.py"
 
 jobs:
   cronos:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: cythonvijay/cronos-action@v1
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: STRICT
