@@ -2,246 +2,27 @@ name: CRONOS Code Analysis
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main, master, develop ]
-
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+    branches: [ main, master ]
 
 jobs:
-  analyze:
-    name: Analyze Code Changes
+  cronos:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for git diff
-      
-      - name: Run CRONOS Analysis
-        id: cronos
+          fetch-depth: 2   # IMPORTANT for git diff
+
+      - name: Run CRONOS
         uses: cythonvijay/cronos-action@v1
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
-          mode: STRICT  # Options: STRICT, BOUNDARY, CONTRACT
-        continue-on-error: true
-      
-      - name: Check Analysis Status
-        id: status
-        run: |
-          if [ -f "cronos-reports/summary.json" ]; then
-            STATUS=$(jq -r '.status' cronos-reports/summary.json)
-            RISK=$(jq -r '.risk' cronos-reports/summary.json)
-            TOTAL=$(jq -r '.total_files' cronos-reports/summary.json)
-            FAILED=$(jq -r '.failed' cronos-reports/summary.json)
-            
-            echo "status=${STATUS}" >> $GITHUB_OUTPUT
-            echo "risk=${RISK}" >> $GITHUB_OUTPUT
-            echo "total=${TOTAL}" >> $GITHUB_OUTPUT
-            echo "failed=${FAILED}" >> $GITHUB_OUTPUT
-            
-            echo "📊 Analysis Complete:"
-            echo "   Status: ${STATUS}"
-            echo "   Risk: ${RISK}/100"
-            echo "   Files: ${TOTAL}"
-            echo "   Failed: ${FAILED}"
-          else
-            echo "⚠️ No summary file found"
-            echo "status=UNKNOWN" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Upload Analysis Reports
-        if: always()
+
+      - name: Upload CRONOS Reports
         uses: actions/upload-artifact@v4
         with:
-          name: cronos-reports-${{ github.run_number }}
+          name: cronos-reports
           path: cronos-reports/
-          retention-days: 30
-          if-no-files-found: warn
-      
-      - name: Comment on PR (Success)
-        if: |
-          always() && 
-          github.event_name == 'pull_request' && 
-          steps.status.outputs.status == 'PASS'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const comment = `## ✅ CRONOS Analysis Passed
-            
-            All code changes have been analyzed and approved.
-            
-            **Summary:**
-            - **Status:** PASS
-            - **Risk Score:** ${{ steps.status.outputs.risk }}/100
-            - **Files Analyzed:** ${{ steps.status.outputs.total }}
-            
-            No high-risk changes detected. Safe to merge! 🎉
-            
-            ---
-            *Detailed reports available in [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-      
-      - name: Comment on PR (Warning)
-        if: |
-          always() && 
-          github.event_name == 'pull_request' && 
-          steps.status.outputs.status == 'WARN'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            let comment = `## ⚠️ CRONOS Analysis Warning
-            
-            Code changes contain potential issues that should be reviewed.
-            
-            **Summary:**
-            - **Status:** WARNING
-            - **Risk Score:** ${{ steps.status.outputs.risk }}/100
-            - **Files Analyzed:** ${{ steps.status.outputs.total }}
-            
-            ### Key Issues Found:
-            
-            `;
-            
-            const reportsDir = 'cronos-reports';
-            if (fs.existsSync(reportsDir)) {
-              const files = fs.readdirSync(reportsDir)
-                .filter(f => f.endsWith('.json') && f !== 'summary.json')
-                .slice(0, 5);
-              
-              for (const file of files) {
-                try {
-                  const reportPath = path.join(reportsDir, file);
-                  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-                  
-                  if (report.status === 'WARN' || report.status === 'FAIL') {
-                    const fileName = file.replace(/_/g, '/').replace('.json', '');
-                    comment += `\n#### 📁 \`${fileName}\`\n`;
-                    comment += `- **Risk:** ${report.risk}/100\n`;
-                    comment += `- **Status:** ${report.status}\n`;
-                    
-                    if (report.summary && report.summary.length > 0) {
-                      comment += '\n**Issues:**\n';
-                      report.summary.slice(0, 3).forEach(issue => {
-                        comment += `- ${issue}\n`;
-                      });
-                    }
-                  }
-                } catch (e) {
-                  console.error(`Error reading ${file}:`, e);
-                }
-              }
-            }
-            
-            comment += `
-            
-            ---
-            *Review recommended before merging. See [detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more information.*
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-      
-      - name: Comment on PR (Failed)
-        if: |
-          always() && 
-          github.event_name == 'pull_request' && 
-          steps.status.outputs.status == 'FAIL'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            let comment = `## ❌ CRONOS Analysis Failed
-            
-            **High-risk code changes detected!** This PR cannot be merged until issues are resolved.
-            
-            **Summary:**
-            - **Status:** FAIL
-            - **Risk Score:** ${{ steps.status.outputs.risk }}/100
-            - **Files Analyzed:** ${{ steps.status.outputs.total }}
-            - **Files Failed:** ${{ steps.status.outputs.failed }}
-            
-            ### Critical Issues:
-            
-            `;
-            
-            const reportsDir = 'cronos-reports';
-            if (fs.existsSync(reportsDir)) {
-              const files = fs.readdirSync(reportsDir)
-                .filter(f => f.endsWith('.json') && f !== 'summary.json')
-                .slice(0, 10);
-              
-              for (const file of files) {
-                try {
-                  const reportPath = path.join(reportsDir, file);
-                  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-                  
-                  if (report.status === 'FAIL') {
-                    const fileName = file.replace(/_/g, '/').replace('.json', '');
-                    comment += `\n#### 📁 \`${fileName}\`\n`;
-                    comment += `- **Risk Score:** ${report.risk}/100 ⚠️\n`;
-                    
-                    if (report.summary && report.summary.length > 0) {
-                      comment += '\n**Critical Issues:**\n';
-                      report.summary.slice(0, 5).forEach(issue => {
-                        comment += `- ❌ ${issue}\n`;
-                      });
-                    }
-                    
-                    if (report.error) {
-                      comment += `\n**Error:** ${report.error}\n`;
-                    }
-                    
-                    comment += '\n';
-                  }
-                } catch (e) {
-                  console.error(`Error reading ${file}:`, e);
-                }
-              }
-            }
-            
-            comment += `
-            ### 🛠️ Next Steps:
-            
-            1. Review the critical issues listed above
-            2. Download the [detailed analysis reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            3. Fix the high-risk changes
-            4. Push updated code for re-analysis
-            
-            ---
-            *This check is blocking merge. Contact your team lead if you believe this is a false positive.*
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-      
-      - name: Fail workflow if analysis failed
-        if: steps.status.outputs.status == 'FAIL'
-        run: |
-          echo "❌ CRONOS analysis failed with risk score: ${{ steps.status.outputs.risk }}/100"
-          echo "This workflow is blocked. Review the analysis reports and fix critical issues."
-          exit 1
