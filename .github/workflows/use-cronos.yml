@@ -1,0 +1,16 @@
+name: CRONOS Guard
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  cronos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: cythonvijay/cronos-action@v1
+        with:
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: STRICT
