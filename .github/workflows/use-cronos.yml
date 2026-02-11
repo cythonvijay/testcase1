@@ -1,20 +1,78 @@
-name: CRONOS Guard
+name: CRONOS Code Analysis
 
 on:
   push:
-    paths:
-      - "**.py"
+    branches: [ main, master, develop ]
   pull_request:
-    paths:
-      - "**.py"
+    branches: [ main, master, develop ]
 
 jobs:
-  cronos:
+  analyze:
+    name: Analyze Code Changes
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: cythonvijay/cronos-action@v1
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          api_url: ${{ secrets.CRONOS_API_URL }}
-          mode: STRICT
+          fetch-depth: 0
+      
+      - name: Run CRONOS Analysis
+        uses: cythonvijay/cronos-action@v1  # Replace with your actual action repo
+        with:
+          api_url: ${{ secrets.CRONOS_API_URL }}  # Store your Render URL in secrets
+          mode: STRICT  # Options: STRICT, BOUNDARY, CONTRACT
+      
+      - name: Upload Analysis Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cronos-reports
+          path: cronos-reports/
+          retention-days: 30
+      
+      - name: Comment on PR (if failed)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read all reports
+            const reportsDir = 'cronos-reports';
+            let comment = '## ❌ CRONOS Analysis Failed\n\n';
+            comment += 'High-risk code changes detected:\n\n';
+            
+            if (fs.existsSync(reportsDir)) {
+              const files = fs.readdirSync(reportsDir);
+              
+              for (const file of files) {
+                const reportPath = path.join(reportsDir, file);
+                const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+                
+                if (report.status === 'FAIL') {
+                  comment += `### 📁 ${file.replace('_', '/')}\n`;
+                  comment += `**Risk Score:** ${report.risk}/100\n`;
+                  comment += `**Status:** ${report.status}\n\n`;
+                  
+                  if (report.summary && report.summary.length > 0) {
+                    comment += '**Key Issues:**\n';
+                    report.summary.slice(0, 3).forEach(issue => {
+                      comment += `- ${issue}\n`;
+                    });
+                    comment += '\n';
+                  }
+                }
+              }
+            }
+            
+            comment += '\n---\n';
+            comment += '*Review the detailed reports in the workflow artifacts for more information.*';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
