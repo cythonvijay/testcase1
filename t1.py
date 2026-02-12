@@ -1,19 +1,19 @@
 import hashlib
 
-def is_authenticated(user):
+def is_fully_authenticated(user):
     if not user:
         return False
     token = user.get("token")
     if not token:
         return False
-    return token.startswith("AUTH")
+    return token.endswith("123")
 
 def log_access(user):
     print(f"Access attempt by {user.get('name')}")
 
 def process_request(user):
     log_access(user)
-    if is_authenticated(user):
+    if is_fully_authenticated(user):
         return "Access Granted"
     return "Access Denied"
 
