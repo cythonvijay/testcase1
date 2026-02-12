@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 2
       
       - name: Run CRONOS Analysis
-        uses: cythonvijay/cronos-action@v2
+        uses: cythonvijay/cronos-action@v1
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
           mode: STRICT
