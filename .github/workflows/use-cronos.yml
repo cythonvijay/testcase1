@@ -1,27 +1,22 @@
 name: CRONOS Analysis
-
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-
 jobs:
   cronos:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      
       - name: Run CRONOS Analysis
         uses: cythonvijay/cronos-action@main
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
           mode: STRICT
-      
       - name: Upload Reports
         uses: actions/upload-artifact@v4
         if: always()
