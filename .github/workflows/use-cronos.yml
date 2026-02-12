@@ -1,4 +1,4 @@
-name: CRONOS
+name: CRONOS Analysis
 
 on:
   push:
@@ -9,18 +9,23 @@ on:
 jobs:
   cronos:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-
-      - uses: cythonvijay/cronos-action@v1
+          fetch-depth: 2  # Get current + previous commit for diff
+      
+      - name: Run CRONOS Analysis
+        uses: cythonvijay/cronos-action@v1
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
-
-      - uses: actions/upload-artifact@v4
-        if: always()
+          mode: STRICT  # Options: STRICT, BOUNDARY, CONTRACT
+      
+      - name: Upload Analysis Reports
+        uses: actions/upload-artifact@v4
+        if: always()  # Upload even if analysis fails
         with:
           name: cronos-reports
           path: cronos-reports/
+          retention-days: 30
