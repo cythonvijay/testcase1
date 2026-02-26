@@ -1,4 +1,4 @@
-name: CRONOS Full Intelligence Analysis
+name: CRONOS Enterprise Intelligence Pipeline
 
 on:
   push:
@@ -6,115 +6,175 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  CRONOS_API_URL: ${{ secrets.CRONOS_API_URL }}
+
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────
-  # Stage 1 — BOUNDARY
-  # Runs first. Allows structural boundary changes (> vs >=).
-  # ─────────────────────────────────────────────────────────────────────────
-  cronos-boundary:
-    name: CRONOS — Boundary Mode
+
+  # ─────────────────────────────────────────
+  # Stage 1 — Boundary Analysis
+  # Fast structural safety validation
+  # ─────────────────────────────────────────
+  boundary:
+    name: CRONOS — Boundary Analysis
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
+
+    outputs:
+      status: ${{ steps.cronos.outputs.status }}
+
     steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run CRONOS Boundary
+        id: cronos
+        uses: cythonvijay/cronos-action@main
+        with:
+          api_url: ${{ env.CRONOS_API_URL }}
+          mode: BOUNDARY
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          pr_number: ${{ github.event.pull_request.number }}
+          post_pr_comment: "false"
+          create_annotations: "true"
+          fail_on_severity: CRITICAL
+
+      - name: Upload Boundary Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-boundary-${{ github.run_id }}
+          path: cronos-reports/
+
+
+  # ─────────────────────────────────────────
+  # Stage 2 — Contract Analysis
+  # API behavior safety
+  # ─────────────────────────────────────────
+  contract:
+    name: CRONOS — Contract Analysis
+    runs-on: ubuntu-latest
+    needs: boundary
+
+    outputs:
+      status: ${{ steps.cronos.outputs.status }}
+
+    steps:
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - uses: cythonvijay/cronos-action@main
+      - name: Run CRONOS Contract
+        id: cronos
+        uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               BOUNDARY
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          pr_number:          ${{ github.event.pull_request.number }}
-          post_pr_comment:    ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          api_url: ${{ env.CRONOS_API_URL }}
+          mode: CONTRACT
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          pr_number: ${{ github.event.pull_request.number }}
+          post_pr_comment: "false"
           create_annotations: "true"
-          repo:               ${{ github.repository }}
-          fail_on_severity:   CRITICAL
+          fail_on_severity: HIGH
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cronos-boundary-reports-${{ github.run_id }}
+          name: cronos-contract-${{ github.run_id }}
           path: cronos-reports/
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Stage 2 — CONTRACT
-  # Runs after BOUNDARY. Validates signatures and return types.
-  # ─────────────────────────────────────────────────────────────────────────
-  cronos-contract:
-    name: CRONOS — Contract Mode
+
+  # ─────────────────────────────────────────
+  # Stage 3 — Strict Analysis
+  # Critical behavior validation
+  # ─────────────────────────────────────────
+  strict:
+    name: CRONOS — Strict Analysis
     runs-on: ubuntu-latest
-    needs: cronos-boundary
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
+    needs: contract
+
+    outputs:
+      status: ${{ steps.cronos.outputs.status }}
+
     steps:
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - uses: cythonvijay/cronos-action@main
+      - name: Run CRONOS Strict
+        id: cronos
+        uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               CONTRACT
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          pr_number:          ${{ github.event.pull_request.number }}
-          post_pr_comment:    ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          api_url: ${{ env.CRONOS_API_URL }}
+          mode: STRICT
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          pr_number: ${{ github.event.pull_request.number }}
+          post_pr_comment: "false"
           create_annotations: "true"
-          repo:               ${{ github.repository }}
-          fail_on_severity:   HIGH
+          fail_on_severity: HIGH
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cronos-contract-reports-${{ github.run_id }}
+          name: cronos-strict-${{ github.run_id }}
           path: cronos-reports/
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Stage 3 — STRICT
-  # Runs after CONTRACT. Blocks any semantic behavior change.
-  # ─────────────────────────────────────────────────────────────────────────
-  cronos-strict:
-    name: CRONOS — Strict Mode
+
+  # ─────────────────────────────────────────
+  # Stage 4 — Unified Intelligence Report
+  # Generates single AI explanation + PR comment
+  # ─────────────────────────────────────────
+  intelligence:
+    name: CRONOS — Unified Intelligence Report
     runs-on: ubuntu-latest
-    needs: cronos-contract
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
+    needs: [boundary, contract, strict]
+
     steps:
+
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - uses: cythonvijay/cronos-action@main
+      - name: Run CRONOS Intelligence Mode
+        uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               STRICT
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          pr_number:          ${{ github.event.pull_request.number }}
-          post_pr_comment:    ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          api_url: ${{ env.CRONOS_API_URL }}
+          mode: STRICT
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          pr_number: ${{ github.event.pull_request.number }}
+
+          # ONLY intelligence stage posts PR comment
+          post_pr_comment: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+
           create_annotations: "true"
-          repo:               ${{ github.repository }}
-          fail_on_severity:   HIGH
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cronos-strict-reports-${{ github.run_id }}
-          path: cronos-reports/
+          fail_on_severity: CRITICAL
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Final gate — waits for all 3 stages
-  # Only reached if BOUNDARY → CONTRACT → STRICT all pass
-  # ─────────────────────────────────────────────────────────────────────────
+
+  # ─────────────────────────────────────────
+  # Final Merge Gate
+  # Only executes if ALL stages passed
+  # ─────────────────────────────────────────
   merge-gate:
     name: CRONOS — Final Merge Gate
     runs-on: ubuntu-latest
-    needs: [ cronos-boundary, cronos-contract, cronos-strict ]
+    needs: intelligence
+
     steps:
-      - run: echo "✅ All CRONOS intelligence stages passed — safe to merge."
+
+      - name: Merge Approval
+        run: |
+          echo "======================================"
+          echo "CRONOS Enterprise Intelligence Passed"
+          echo "Code is SAFE for merge"
+          echo "======================================"
