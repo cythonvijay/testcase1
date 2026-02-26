@@ -11,7 +11,6 @@ on:
 
 jobs:
 
-# Stage 1 — Boundary
   boundary:
 
     name: CRONOS — Boundary Mode
@@ -32,7 +31,7 @@ jobs:
           full_analysis: "false"
 
 
-# Stage 2 — Contract
+
   contract:
 
     name: CRONOS — Contract Mode
@@ -54,7 +53,7 @@ jobs:
           full_analysis: "false"
 
 
-# Stage 3 — Strict
+
   strict:
 
     name: CRONOS — Strict Mode
@@ -76,13 +75,12 @@ jobs:
           full_analysis: "false"
 
 
-# Stage 4 — Unified Intelligence (FULL AI)
+
   intelligence:
 
     name: CRONOS — Unified Intelligence Report
     runs-on: ubuntu-latest
     needs: strict
-    if: always()
 
     steps:
 
@@ -102,7 +100,7 @@ jobs:
           full_analysis: "true"
 
 
-# Final merge gate
+
   merge-gate:
 
     name: CRONOS — Merge Gate
