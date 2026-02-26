@@ -1,4 +1,4 @@
-name: CRONOS Dual Mode Analysis
+name: CRONOS Full Intelligence Analysis
 
 on:
   push:
@@ -7,13 +7,14 @@ on:
     branches: [ main, master ]
 
 jobs:
-  # ─────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   # Job 1 — BOUNDARY mode
-  # Runs first. Allows boundary operator changes (> vs >=).
-  # Lower gate: surfaces quality/security scores for visibility.
-  # ─────────────────────────────────────────────────────────────
+  # Runs first on every push/PR.
+  # Allows structural boundary changes (> vs >=).
+  # Catches quality + security + execution issues early.
+  # ═══════════════════════════════════════════════════════════════════════════
   cronos-boundary:
-    name: CRONOS Boundary Mode
+    name: CRONOS — Boundary Mode
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -21,26 +22,26 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Run CRONOS (BOUNDARY)
+      - name: Run CRONOS Full Analysis (BOUNDARY)
         uses: cythonvijay/cronos-action@main
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
           mode: BOUNDARY
 
-      - name: Upload Boundary Reports
+      - name: Upload Boundary Intelligence Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cronos-boundary-reports
           path: cronos-reports/
 
-  # ─────────────────────────────────────────────────────────────
-  # Job 2 — STRICT mode
-  # Runs after BOUNDARY. Blocks any semantic change.
-  # Acts as the final merge gate.
-  # ─────────────────────────────────────────────────────────────
-  cronos-strict:
-    name: CRONOS Strict Mode
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 2 — CONTRACT mode
+  # Runs after BOUNDARY.
+  # Validates interface/contract compliance (function signatures, return types).
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-contract:
+    name: CRONOS — Contract Mode
     runs-on: ubuntu-latest
     needs: cronos-boundary
     steps:
@@ -49,13 +50,41 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Run CRONOS (STRICT)
+      - name: Run CRONOS Full Analysis (CONTRACT)
+        uses: cythonvijay/cronos-action@main
+        with:
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: CONTRACT
+
+      - name: Upload Contract Intelligence Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-contract-reports
+          path: cronos-reports/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 3 — STRICT mode  ← final merge gate
+  # Runs last. Blocks any semantic behavior change.
+  # Full intelligence output: hashes, execution prediction, AI explanation.
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-strict:
+    name: CRONOS — Strict Mode (Merge Gate)
+    runs-on: ubuntu-latest
+    needs: [ cronos-boundary, cronos-contract ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run CRONOS Full Analysis (STRICT)
         uses: cythonvijay/cronos-action@main
         with:
           api_url: ${{ secrets.CRONOS_API_URL }}
           mode: STRICT
 
-      - name: Upload Strict Reports
+      - name: Upload Strict Intelligence Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
