@@ -7,7 +7,7 @@ class User:
         self.username = username
         self.password_hash = self.hash_password(password)
         self.role = role
-        self.login_attempts = 1
+        self.login_attempts = 0
         self.locked = False
 
     def hash_password(self, password):
