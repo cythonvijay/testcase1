@@ -3,7 +3,7 @@ import time
 import random
 
 class User:
-    def __init__(self, username, password, role="user"):
+    def __init__(self, username, password, role="user")
         self.username = username
         self.password_hash = self.hash_password(password)
         self.role = role
