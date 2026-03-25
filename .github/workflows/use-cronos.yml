@@ -1,120 +1,115 @@
-name: CRONOS Full Enterprise Intelligence
-
-# ============================================================================
-# CRONOS 4-Stage Enterprise CI/CD Pipeline
-#
-# Stage 1 — BOUNDARY   : boundary condition analysis   (always runs)
-# Stage 2 — CONTRACT   : contract compliance analysis  (always runs)
-# Stage 3 — STRICT     : strict behavioral enforcement (always runs)
-# Stage 4 — UNIFIED    : full intelligence report      (only if 1+2+3 all pass)
-#
-# FIX: Removed continue-on-error from all stages.
-# continue-on-error: true causes GitHub to report result='success' even when
-# steps inside the job fail — making needs.<job>.result always 'success' and
-# causing the merge gate to pass incorrectly.
-#
-# Instead, all 3 analysis jobs run in parallel (no 'needs' between them),
-# the merge-gate runs with if: always() and correctly reads their real results,
-# and stage 4 only runs when all 3 genuinely passed.
-# ============================================================================
+name: CRONOS Enterprise Intelligence
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
 
 jobs:
 
-  # ── Stage 1: BOUNDARY ──────────────────────────────────────────────────────
-  boundary:
-    name: "Stage 1 — BOUNDARY Analysis"
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Stage 1 — BOUNDARY Analysis
+  # First gate. Detects boundary changes (> vs >=), quality, security.
+  # fail_on_severity: MEDIUM — blocks anything above LOW severity.
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-boundary:
+    name: Stage 1 — BOUNDARY Analysis
     runs-on: ubuntu-latest
-    # FIX: No continue-on-error here — real failure must surface as result='failure'
     steps:
-      - name: Checkout (full diff)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: CRONOS — Boundary Mode
+      - name: Run CRONOS (BOUNDARY)
         uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               BOUNDARY
-          repo:               ${{ github.repository }}
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          fail_on_severity:   CRITICAL
-          full_analysis:      "true"
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: BOUNDARY
+          fail_on_severity: MEDIUM
+          full_analysis: "true"
           create_annotations: "true"
-          post_pr_comment:    "false"
 
-  # ── Stage 2: CONTRACT ──────────────────────────────────────────────────────
-  contract:
-    name: "Stage 2 — CONTRACT Analysis"
+      - name: Upload Boundary Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-boundary-reports
+          path: cronos-reports/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Stage 2 — CONTRACT Analysis
+  # Validates interface and function signature compliance.
+  # fail_on_severity: HIGH
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-contract:
+    name: Stage 2 — CONTRACT Analysis
     runs-on: ubuntu-latest
-    # FIX: No continue-on-error — runs in parallel with boundary, not blocked by it
+    needs: cronos-boundary
     steps:
-      - name: Checkout (full diff)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: CRONOS — Contract Mode
+      - name: Run CRONOS (CONTRACT)
         uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               CONTRACT
-          repo:               ${{ github.repository }}
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          fail_on_severity:   HIGH
-          full_analysis:      "true"
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: CONTRACT
+          fail_on_severity: HIGH
+          full_analysis: "true"
           create_annotations: "true"
-          post_pr_comment:    "false"
 
-  # ── Stage 3: STRICT ────────────────────────────────────────────────────────
-  strict:
-    name: "Stage 3 — STRICT Analysis"
+      - name: Upload Contract Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-contract-reports
+          path: cronos-reports/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Stage 3 — STRICT Analysis
+  # Final semantic gate. Blocks ANY behavioral change.
+  # fail_on_severity: HIGH
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-strict:
+    name: Stage 3 — STRICT Analysis
     runs-on: ubuntu-latest
-    # FIX: No continue-on-error — runs in parallel, real failure = result='failure'
+    needs: [ cronos-boundary, cronos-contract ]
     steps:
-      - name: Checkout (full diff)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: CRONOS — Strict Mode
+      - name: Run CRONOS (STRICT)
         uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               STRICT
-          repo:               ${{ github.repository }}
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          fail_on_severity:   HIGH
-          full_analysis:      "true"
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: STRICT
+          fail_on_severity: HIGH
+          full_analysis: "true"
           create_annotations: "true"
-          post_pr_comment:    "false"
 
-  # ── Stage 4: UNIFIED INTELLIGENCE (only if all 3 genuinely passed) ─────────
-  intelligence:
-    name: "Stage 4 — UNIFIED Intelligence Report"
+      - name: Upload Strict Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-strict-reports
+          path: cronos-reports/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Stage 4 — UNIFIED Intelligence Report
+  # Runs ONLY if all 3 stages pass. Generates consolidated full report.
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-unified:
+    name: Stage 4 — UNIFIED Intelligence Report
     runs-on: ubuntu-latest
-    needs:
-      - boundary
-      - contract
-      - strict
-    # FIX: Without continue-on-error masking, needs.<job>.result is now accurate.
-    # This condition will correctly skip if any real failure occurred.
-    if: |
-      needs.boundary.result == 'success' &&
-      needs.contract.result == 'success' &&
-      needs.strict.result   == 'success'
+    needs: [ cronos-boundary, cronos-contract, cronos-strict ]
     steps:
-      - name: Checkout (full diff)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -122,71 +117,59 @@ jobs:
       - name: CRONOS — Unified Intelligence (full report + PR comment)
         uses: cythonvijay/cronos-action@main
         with:
-          api_url:            ${{ secrets.CRONOS_API_URL }}
-          mode:               STRICT
-          repo:               ${{ github.repository }}
-          github_token:       ${{ secrets.GITHUB_TOKEN }}
-          pr_number:          ${{ github.event.pull_request.number }}
-          post_pr_comment:    "true"
+          api_url: ${{ secrets.CRONOS_API_URL }}
+          mode: STRICT
+          fail_on_severity: HIGH
+          full_analysis: "true"
           create_annotations: "true"
-          fail_on_severity:   HIGH
-          full_analysis:      "true"
+          post_pr_comment: "false"
 
-  # ── Merge Gate: enforces all 3 stages passed ───────────────────────────────
-  merge-gate:
-    name: "CRONOS — Merge Gate"
+      - name: Upload Unified Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cronos-unified-reports
+          path: cronos-reports/
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CRONOS Merge Gate
+  # Evaluates all stage outcomes and produces final merge decision.
+  # ═══════════════════════════════════════════════════════════════════════════
+  cronos-merge-gate:
+    name: CRONOS — Merge Gate
     runs-on: ubuntu-latest
-    needs:
-      - boundary
-      - contract
-      - strict
-    # Always run so it can report consolidated pass/fail regardless of upstream
+    needs: [ cronos-boundary, cronos-contract, cronos-strict, cronos-unified ]
     if: always()
     steps:
       - name: Evaluate stage outcomes
-        shell: bash
+        env:
+          BOUNDARY: ${{ needs.cronos-boundary.result }}
+          CONTRACT: ${{ needs.cronos-contract.result }}
+          STRICT:   ${{ needs.cronos-strict.result }}
+          UNIFIED:  ${{ needs.cronos-unified.result }}
         run: |
-          BOUNDARY="${{ needs.boundary.result }}"
-          CONTRACT="${{ needs.contract.result }}"
-          STRICT="${{ needs.strict.result }}"
-
           echo "=============================================================="
           echo "  CRONOS Merge Gate — Stage Outcomes"
           echo "=============================================================="
           echo "  Stage 1 BOUNDARY : $BOUNDARY"
           echo "  Stage 2 CONTRACT : $CONTRACT"
           echo "  Stage 3 STRICT   : $STRICT"
+          echo "  Stage 4 UNIFIED  : $UNIFIED"
           echo "=============================================================="
 
           FAILED=0
+          [ "$BOUNDARY" != "success" ] && echo "  ❌ BOUNDARY failed" && FAILED=1
+          [ "$CONTRACT" != "success" ] && echo "  ❌ CONTRACT failed" && FAILED=1
+          [ "$STRICT"   != "success" ] && echo "  ❌ STRICT failed"   && FAILED=1
 
-          if [ "$BOUNDARY" != "success" ]; then
-            echo "  ❌ BOUNDARY stage did not pass (result: $BOUNDARY)"
-            FAILED=1
-          else
-            echo "  ✅ BOUNDARY passed"
-          fi
-
-          if [ "$CONTRACT" != "success" ]; then
-            echo "  ❌ CONTRACT stage did not pass (result: $CONTRACT)"
-            FAILED=1
-          else
-            echo "  ✅ CONTRACT passed"
-          fi
-
-          if [ "$STRICT" != "success" ]; then
-            echo "  ❌ STRICT stage did not pass (result: $STRICT)"
-            FAILED=1
-          else
-            echo "  ✅ STRICT passed"
-          fi
+          if [ "$BOUNDARY" = "success" ]; then echo "  ✅ BOUNDARY passed"; fi
+          if [ "$CONTRACT" = "success" ]; then echo "  ✅ CONTRACT passed"; fi
+          if [ "$STRICT"   = "success" ]; then echo "  ✅ STRICT passed";   fi
 
           echo "=============================================================="
-
           if [ "$FAILED" = "1" ]; then
-            echo "  ❌ MERGE GATE FAILED — one or more CRONOS stages did not pass."
-            echo "     Review the per-stage explanations in the job logs above."
-            echo "     The Unified Intelligence stage was skipped as a result."
+            echo "  ❌ MERGE GATE FAILED — one or more CRONOS stages failed."
+            echo "     Fix the issues highlighted above before merging."
             echo "=============================================================="
             exit 1
           else
