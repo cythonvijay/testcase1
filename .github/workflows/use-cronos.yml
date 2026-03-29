@@ -7,123 +7,41 @@ on:
     branches: [ main, master ]
 
 jobs:
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # ALL 3 ANALYSIS MODES RUN IN PARALLEL — no sequential waiting
-  # Each mode independently analyzes ALL Python files (and non-.py files too)
-  # ═══════════════════════════════════════════════════════════════════════════
-
-  cronos-boundary:
-    name: Stage 1 — BOUNDARY Analysis
+  cronos-analysis:
+    name: CRONOS Analysis (${{ matrix.mode }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       checks: write
+    strategy:
+      fail-fast: false # Ensures all modes finish analyzing even if one fails early
+      matrix:
+        include:
+          - mode: BOUNDARY
+            severity: MEDIUM
+          - mode: CONTRACT
+            severity: HIGH
+          - mode: STRICT
+            severity: HIGH
+            
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          
       - uses: cythonvijay/cronos-action@main
         with:
           api_url:          ${{ secrets.CRONOS_API_URL }}
-          mode:             BOUNDARY
-          fail_on_severity: MEDIUM
+          mode:             ${{ matrix.mode }}
+          fail_on_severity: ${{ matrix.severity }}
           github_token:     ${{ secrets.GITHUB_TOKEN }}
           pr_number:        ${{ github.event.pull_request.number }}
           repo:             ${{ github.repository }}
+          
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cronos-boundary-${{ github.run_id }}
+          name: cronos-${{ matrix.mode }}-report-${{ github.run_id }}
           path: cronos-reports/
           if-no-files-found: warn
-
-  cronos-contract:
-    name: Stage 2 — CONTRACT Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: cythonvijay/cronos-action@main
-        with:
-          api_url:          ${{ secrets.CRONOS_API_URL }}
-          mode:             CONTRACT
-          fail_on_severity: HIGH
-          github_token:     ${{ secrets.GITHUB_TOKEN }}
-          pr_number:        ${{ github.event.pull_request.number }}
-          repo:             ${{ github.repository }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cronos-contract-${{ github.run_id }}
-          path: cronos-reports/
-          if-no-files-found: warn
-
-  cronos-strict:
-    name: Stage 3 — STRICT Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: cythonvijay/cronos-action@main
-        with:
-          api_url:          ${{ secrets.CRONOS_API_URL }}
-          mode:             STRICT
-          fail_on_severity: HIGH
-          github_token:     ${{ secrets.GITHUB_TOKEN }}
-          pr_number:        ${{ github.event.pull_request.number }}
-          repo:             ${{ github.repository }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cronos-strict-${{ github.run_id }}
-          path: cronos-reports/
-          if-no-files-found: warn
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # MERGE GATE — waits for all 3 parallel stages, evaluates combined result
-  # ═══════════════════════════════════════════════════════════════════════════
-  cronos-merge-gate:
-    name: CRONOS — Merge Gate
-    runs-on: ubuntu-latest
-    needs: [ cronos-boundary, cronos-contract, cronos-strict ]
-    if: always()
-    steps:
-      - name: Evaluate stage outcomes
-        env:
-          BOUNDARY: ${{ needs.cronos-boundary.result }}
-          CONTRACT: ${{ needs.cronos-contract.result }}
-          STRICT:   ${{ needs.cronos-strict.result }}
-        run: |
-          echo "=============================================================="
-          echo "  CRONOS Merge Gate — Stage Outcomes"
-          echo "=============================================================="
-          echo "  Stage 1 BOUNDARY : $BOUNDARY"
-          echo "  Stage 2 CONTRACT : $CONTRACT"
-          echo "  Stage 3 STRICT   : $STRICT"
-          echo "=============================================================="
-          FAILED=0
-          [ "$BOUNDARY" != "success" ] && echo "  BOUNDARY failed" && FAILED=1
-          [ "$CONTRACT" != "success" ] && echo "  CONTRACT failed" && FAILED=1
-          [ "$STRICT"   != "success" ] && echo "  STRICT failed"   && FAILED=1
-          [ "$BOUNDARY" = "success" ] && echo "  BOUNDARY passed"
-          [ "$CONTRACT" = "success" ] && echo "  CONTRACT passed"
-          [ "$STRICT"   = "success" ] && echo "  STRICT passed"
-          echo "=============================================================="
-          if [ "$FAILED" = "1" ]; then
-            echo "  MERGE GATE FAILED"
-            exit 1
-          fi
-          echo "  MERGE GATE PASSED — all CRONOS stages passed."
-          exit 0
