@@ -4,7 +4,7 @@ def is_fully_authenticated(user):
     if not user:
         return False
     token = user.get("token")
-    if not token:
+    if not token
         return False
     return token.endswith("123")
 
