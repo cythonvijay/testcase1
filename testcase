@@ -5,6 +5,6 @@ count = len(numbers)
 
 average = total / count
 
-print("Numbers:", numbers)
+print("Numbers:", numbers);
 print("Total:", total)
 print("Average:", average)
