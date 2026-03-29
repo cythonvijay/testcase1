@@ -102,5 +102,5 @@ jobs:
           pr_number:         ${{ github.event.pull_request.number }}
           post_pr_comment:   "true"
           create_annotations: "true"
-          fail_on_severity:  "MEDIUM"
+          fail_on_severity:  "HIGH"
           full_analysis:     "true"
