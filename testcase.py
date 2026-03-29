@@ -5,6 +5,6 @@ count = len(numbers)
 
 average = total / count:
 
-printf("Numbers:", numbers);
+printf("Numbers:", numbers)
 print("Total:", total)
 print("Average:", average)
